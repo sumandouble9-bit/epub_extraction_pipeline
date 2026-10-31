@@ -1,6 +1,7 @@
 """Turn EPUB XHTML documents into an ordered stream of blocks with styled runs."""
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -777,10 +778,33 @@ _ABOUT_AUTHOR = re.compile(
 
 _TITLE_PAGE_CLASSES = {"title", "booktitle", "book-title", "halftitle"}
 _COVER_CLASSES = {"cover", "cover_image", "cover-image", "coverimage"}
+_TOC_CLASSES = {"toc", "tocch", "contents", "toc1", "nonetoc"}
 
 _EPUB_NS = "http://www.idpf.org/2007/ops"
 _EPUB_FRONT_TYPES = {"frontmatter", "cover", "titlepage", "toc",
                      "copyright-page", "colophon", "dedication"}
+
+# Filenames that identify a front-matter / about-author document even when the
+# markup carries no epub:type and uses only visual CSS classes.
+_FRONT_FILENAME_HINTS = {
+    "titlepage", "title", "halftitle", "half-title", "cover",
+    "copy", "copyright", "contents", "toc", "dedication", "colophon",
+    "imprint", "epigraph",
+}
+_ABOUT_AUTHOR_FILENAME_HINTS = {
+    "bio", "biography", "author", "aboutauthor", "about_author",
+    "about-the-author", "abouttheauthor",
+}
+
+# Class names that mark a copyright page (copyhead, copy0, copy1 ...).
+_COPYRIGHT_CLASS_PREFIXES = ("copy",)
+# Strong textual signals of a copyright page.
+_COPYRIGHT_TEXT = re.compile(
+    r"all rights reserved|copyright\s*(?:©|\(c\))|©\s*\d{4}|"
+    r"isbn\b|no part of this (?:publication|book) may be reproduced",
+    re.I)
+# A table-of-contents heading ("Contents" / "Table of Contents").
+_TOC_HEADING = re.compile(r"^\s*(?:table of\s+)?contents\s*$", re.I)
 
 
 def _classify_doc(epub, path: str) -> str:
@@ -793,6 +817,7 @@ def _classify_doc(epub, path: str) -> str:
 
     all_classes = set()
     all_headings = []
+    text_parts = []
     has_epub_front = False
     has_epub_body = False
     block_count = 0
@@ -820,12 +845,26 @@ def _classify_doc(epub, path: str) -> str:
 
         if tag in BLOCK_TAGS:
             block_count += 1
+            if len(text_parts) < 40 and el.text:
+                text_parts.append(el.text)
 
+    fname = os.path.splitext(os.path.basename(path))[0].lower()
+    all_text = " ".join(text_parts)
+    has_copyright_class = any(
+        c.startswith(_COPYRIGHT_CLASS_PREFIXES) for c in all_classes)
+
+    # --- about the author -------------------------------------------------
     for ht in all_headings:
         if _ABOUT_AUTHOR.search(ht):
             return "about_author"
+    if fname in _ABOUT_AUTHOR_FILENAME_HINTS:
+        return "about_author"
 
+    # --- front matter: epub:type, filename, classes, or text -------------
     if has_epub_front:
+        return "front"
+
+    if fname in _FRONT_FILENAME_HINTS:
         return "front"
 
     if all_classes & _COVER_CLASSES and block_count <= 2:
@@ -834,47 +873,44 @@ def _classify_doc(epub, path: str) -> str:
     if all_classes & _TITLE_PAGE_CLASSES:
         return "front"
 
+    if all_classes & _TOC_CLASSES:
+        return "front"
+
+    # Short page whose heading is "Contents" -> table of contents.
+    for ht in all_headings:
+        if _TOC_HEADING.match(ht):
+            return "front"
+
+    # Copyright page: copy* classes, or copyright text on a short page.
+    if has_copyright_class:
+        return "front"
+    if block_count <= 25 and _COPYRIGHT_TEXT.search(all_text):
+        return "front"
+
     return "body"
 
 
 def trim_to_body_start(blocks: list[Block], epub) -> list[Block]:
-    """Drop front matter and 'about the author' docs.
+    """Drop front matter and 'about the author' documents.
 
-    Everything after the last front-matter/about-author document is kept.
-    When the first body document has content before its first heading
-    (epigraphs, dedications), that content is included.
+    Any document classified as front matter (title page, cover, copyright,
+    table of contents, dedication ...) or 'about the author' is removed,
+    wherever it appears in the spine. Dropping by document type rather than
+    by position means a single document that slips past the classifier can
+    only leak itself -- it can no longer switch trimming off and drag every
+    following front-matter document into the body (which is what let the
+    copyright/TOC/bio pages reach text.json).
+
+    Epigraphs or dedications that live inside a body chapter document are
+    kept, because that document is classified 'body'.
     """
     doc_types = {}
     for b in blocks:
         if b.doc not in doc_types:
             doc_types[b.doc] = _classify_doc(epub, b.doc)
 
-    last_skip_doc = None
-    doc_order = []
-    seen = set()
-    for b in blocks:
-        if b.doc not in seen:
-            seen.add(b.doc)
-            doc_order.append(b.doc)
-
-    for doc in doc_order:
-        if doc_types[doc] in ("front", "about_author"):
-            last_skip_doc = doc
-
-    if last_skip_doc is None:
-        return blocks
-
-    result = []
-    skipping = True
-    for b in blocks:
-        if skipping:
-            if b.doc == last_skip_doc:
-                continue
-            if doc_types[b.doc] in ("front", "about_author"):
-                continue
-            skipping = False
-        result.append(b)
-    return result
+    return [b for b in blocks
+            if doc_types[b.doc] not in ("front", "about_author")]
 
 
 def extract_blocks(epub, skip_front_matter: bool = True) -> list[Block]:
