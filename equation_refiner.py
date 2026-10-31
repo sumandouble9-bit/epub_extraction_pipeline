@@ -1,10 +1,3 @@
-"""LLM-based equation text refinement via the llama-server GPU array.
-
-Same server and ports as the IDML pipeline (llm_equation_classifier.py).
-The heuristic extracts the equation span; the LLM cleans it up
-(dash normalization, prefix stripping, etc.).  If the LLM returns
-garbage the heuristic result is kept.
-"""
 from __future__ import annotations
 
 import json
@@ -19,7 +12,6 @@ SERVER_IP = "103.181.20.53"
 LLAMA_URLS = [f"http://{SERVER_IP}:{port}/v1/chat/completions" for port in PORTS]
 LLAMA_WORKERS = len(LLAMA_URLS) * 8
 
-# Populated at runtime by refine_equations_via_llm health check
 _healthy_urls: list[str] = []
 _port_shift_log: list[str] = []
 
@@ -161,11 +153,7 @@ def _llama_latex(args) -> tuple[int, str]:
 
 def refine_equations_via_llm(equations: list[dict], *, skip: bool = False,
                              log_data: dict | None = None) -> None:
-    """Refine equation latex in each entry using the LLM.
-
-    Sends the HEURISTIC LATEX (not prompt_text) to the LLM for cleanup.
-    Only overwrites if the LLM produces a valid, overlapping result.
-    """
+    """Refine equation latex in each entry using the LLM."""
     if log_data is None:
         log_data = {}
 

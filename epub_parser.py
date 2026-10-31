@@ -1,4 +1,3 @@
-"""Turn EPUB XHTML documents into an ordered stream of blocks with styled runs."""
 from __future__ import annotations
 
 import os
@@ -7,7 +6,6 @@ from dataclasses import dataclass, field
 
 from css_resolver import INHERITED, Stylesheet
 
-# Emitted in this order so char_style lists are stable and comparable.
 STYLE_ORDER = [
     "bold", "italic", "underline", "strikethrough",
     "allcaps", "smallcaps", "superscript", "subscript",
@@ -22,7 +20,6 @@ HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 SKIP_TAGS = {"script", "style", "head", "title", "meta", "link"}
 LIST_TAGS = {"ul", "ol", "dl"}
 
-# User-agent defaults that the author stylesheet may still override.
 TAG_STYLES = {
     "b": {"bold"}, "strong": {"bold"},
     "i": {"italic"}, "em": {"italic"}, "cite": {"italic"}, "var": {"italic"},
@@ -35,20 +32,11 @@ TAG_STYLES = {
 
 _WS = re.compile(r"\s+")
 
-# The newline character used inside assembled block text.
 _NL = "\n"
 
 
 class _HardBreak:
-    """Unique sentinel marking a real ``<br/>`` in the inline chunk stream.
-
-    It must NOT be a plain ``"\\n"`` string: pretty-printed EPUB markup leaves
-    incidental newlines in element text/tails, and if the sentinel were equal
-    to those the assembler would count each of them as a line break (turning a
-    single ``<br/>`` into ``\\n\\n\\n``). As a distinct object, only genuine
-    ``<br/>`` elements produce a break; formatting whitespace collapses to a
-    space like any other whitespace.
-    """
+    """Unique sentinel marking a real ``<br/>`` in the inline chunk stream."""
 
     __slots__ = ()
 
@@ -72,10 +60,7 @@ _ROMAN_SET = set("ivxlcdmIVXLCDM")
 
 
 def _detect_text_marker(text: str):
-    """Detect a), b), 1), i), A) etc. at the start of text.
-
-    Returns (marker_type, clean_text) or (None, text).
-    """
+    """Detect a), b), 1), i), A) etc. at the start of text."""
     m = _TEXT_MARKER.match(text)
     if not m:
         return None, text
@@ -94,7 +79,8 @@ def _detect_text_marker(text: str):
 
 
 def _strip_text_markers(text, spans):
-    """Strip detected text markers (a), b), 1) etc.) from \n-separated lines in cell text."""
+    """Strip detected text markers (a), b), 1) etc.) from
+    -separated lines in cell text."""
     if "\n" not in text:
         return text, spans
     parts = text.split("\n")
@@ -165,8 +151,6 @@ class Run:
     text: str
     styles: tuple[str, ...]
     index: list[int]
-    # Character offsets into the parent block text; used for LaTeX conversion,
-    # not part of the serialised output.
     start: int = 0
     end: int = 0
 
@@ -182,7 +166,7 @@ class ImageRef:
 
 @dataclass
 class Block:
-    kind: str                       # "para" | "table" | "image"
+    kind: str
     doc: str
     tag: str = "p"
     classes: tuple[str, ...] = ()
@@ -192,7 +176,6 @@ class Block:
     images: list[ImageRef] = field(default_factory=list)
     base_styles: frozenset = frozenset()
     align: str | None = None
-    # table only
     rows: int = 0
     columns: int = 0
     header_rows: int = 0
@@ -263,7 +246,6 @@ class DocumentExtractor:
         self.blocks: list[Block] = []
         self._cache: dict[tuple, dict] = {}
 
-    # ------------------------------------------------------------ css helper
 
     def _el_desc(self, el) -> dict:
         return {
@@ -288,7 +270,6 @@ class DocumentExtractor:
         merged.update(own)
         return styles_from_declarations(own, base), merged
 
-    # -------------------------------------------------------------- walking
 
     def run(self, root) -> list[Block]:
         body = None
@@ -423,7 +404,6 @@ class DocumentExtractor:
 
         _flush_inline()
 
-    # ------------------------------------------------------------- builders
 
     @staticmethod
     def _align(decls: dict) -> str | None:
@@ -491,12 +471,7 @@ class DocumentExtractor:
         return chunks, images
 
     def _cell_lines(self, cell, path, styles, decls) -> list[dict]:
-        """Block-level children of a table cell, extracted one by one.
-
-        A cell often stacks the steps of a calculation in separate paragraphs,
-        and each of those is its own formula rather than one long expression.
-        Handles <ul>/<ol> by extracting each <li> as a separate line.
-        """
+        """Block-level children of a table cell, extracted one by one."""
         flat = []
         for child in cell:
             tag = local_name(child.tag)
@@ -542,8 +517,6 @@ class DocumentExtractor:
         length = 0
         for raw, styles in chunks:
             if raw is _BR:
-                # Drop whitespace emitted just before the break so the two
-                # lines join cleanly (no trailing " " before the newline).
                 while pieces and pieces[-1].endswith(" "):
                     s, e, st = spans[-1]
                     if e - 1 > s:
@@ -561,8 +534,6 @@ class DocumentExtractor:
             piece = _WS.sub(" ", raw)
             if not piece:
                 continue
-            # Suppress a leading space at the very start, after another space,
-            # or immediately after a hard break.
             if piece.startswith(" ") and (
                     length == 0
                     or pieces[-1].endswith(" ")
@@ -810,7 +781,6 @@ class DocumentExtractor:
         )
 
 
-# Spine documents that are never part of the book body.
 _ABOUT_AUTHOR = re.compile(
     r"about\s+the\s+author|author\s+bio|biography", re.I)
 
@@ -823,8 +793,6 @@ _EPUB_NS = "http://www.idpf.org/2007/ops"
 _EPUB_FRONT_TYPES = {"frontmatter", "cover", "titlepage", "toc",
                      "copyright-page", "colophon", "dedication"}
 
-# Filenames that identify a front-matter / about-author document even when the
-# markup carries no epub:type and uses only visual CSS classes.
 _FRONT_FILENAME_HINTS = {
     "titlepage", "title", "halftitle", "half-title", "cover",
     "copy", "copyright", "contents", "toc", "dedication", "colophon",
@@ -835,21 +803,17 @@ _ABOUT_AUTHOR_FILENAME_HINTS = {
     "about-the-author", "abouttheauthor",
 }
 
-# Class names that mark a copyright page (copyhead, copy0, copy1 ...).
 _COPYRIGHT_CLASS_PREFIXES = ("copy",)
-# Strong textual signals of a copyright page.
 _COPYRIGHT_TEXT = re.compile(
     r"all rights reserved|copyright\s*(?:©|\(c\))|©\s*\d{4}|"
     r"isbn\b|no part of this (?:publication|book) may be reproduced",
     re.I)
-# A table-of-contents heading ("Contents" / "Table of Contents").
 _TOC_HEADING = re.compile(r"^\s*(?:table of\s+)?contents\s*$", re.I)
 
 
 def _classify_doc(epub, path: str) -> str:
     """Classify a spine document as 'front', 'about_author', or 'body'
-    by inspecting epub:type attributes, heading text, and element classes.
-    """
+    by inspecting epub:type attributes, heading text, and element classes."""
     root = epub.parse_xhtml(path)
     if root is None:
         return "body"
@@ -892,14 +856,12 @@ def _classify_doc(epub, path: str) -> str:
     has_copyright_class = any(
         c.startswith(_COPYRIGHT_CLASS_PREFIXES) for c in all_classes)
 
-    # --- about the author -------------------------------------------------
     for ht in all_headings:
         if _ABOUT_AUTHOR.search(ht):
             return "about_author"
     if fname in _ABOUT_AUTHOR_FILENAME_HINTS:
         return "about_author"
 
-    # --- front matter: epub:type, filename, classes, or text -------------
     if has_epub_front:
         return "front"
 
@@ -915,12 +877,10 @@ def _classify_doc(epub, path: str) -> str:
     if all_classes & _TOC_CLASSES:
         return "front"
 
-    # Short page whose heading is "Contents" -> table of contents.
     for ht in all_headings:
         if _TOC_HEADING.match(ht):
             return "front"
 
-    # Copyright page: copy* classes, or copyright text on a short page.
     if has_copyright_class:
         return "front"
     if block_count <= 25 and _COPYRIGHT_TEXT.search(all_text):
@@ -930,19 +890,7 @@ def _classify_doc(epub, path: str) -> str:
 
 
 def trim_to_body_start(blocks: list[Block], epub) -> list[Block]:
-    """Drop front matter and 'about the author' documents.
-
-    Any document classified as front matter (title page, cover, copyright,
-    table of contents, dedication ...) or 'about the author' is removed,
-    wherever it appears in the spine. Dropping by document type rather than
-    by position means a single document that slips past the classifier can
-    only leak itself -- it can no longer switch trimming off and drag every
-    following front-matter document into the body (which is what let the
-    copyright/TOC/bio pages reach text.json).
-
-    Epigraphs or dedications that live inside a body chapter document are
-    kept, because that document is classified 'body'.
-    """
+    """Drop front matter and 'about the author' documents."""
     doc_types = {}
     for b in blocks:
         if b.doc not in doc_types:

@@ -1,8 +1,3 @@
-"""Utility functions to remove subscript/superscript markers from prompt_text.
-
-Only removes _() ^() markers where runs confirm subscript/superscript char_style.
-Normal underscores in text (M___, |________|, etc.) are never touched.
-"""
 import re
 
 _MARKER_PAT = re.compile(r"([_^])\(([^)]+)\)|([_^])([^\s()\[\]{}_^])")

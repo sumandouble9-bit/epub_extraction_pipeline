@@ -1,4 +1,3 @@
-"""Assemble the content JSON and the equations JSON from extracted blocks."""
 from __future__ import annotations
 
 import dataclasses
@@ -191,7 +190,6 @@ class Builder:
         self._hashes: set[str] = set()
         self._image_cache: dict[str, dict] = {}
 
-    # ----------------------------------------------------------------- main
 
     def build(self) -> Result:
         items: list[dict] = []
@@ -254,7 +252,6 @@ class Builder:
             if owner is not None and "message_index" in equation:
                 equation["message_index"] = owner["message_index"]
 
-    # ------------------------------------------------------------ paragraphs
 
     def _resolve_style(self, block) -> str:
         return self.profile.applied_style(block)
@@ -269,16 +266,7 @@ class Builder:
 
     @staticmethod
     def _consolidate_runs(text, runs):
-        """Merge consecutive runs that share a dominant style; emit extras separately.
-
-        Finds the dominant char_style (by character count), then merges all
-        consecutive runs whose styles are a superset of the dominant into one
-        run.  For each merged run that carried extra styles beyond the dominant,
-        a separate run is emitted with only those extras.  Runs whose styles
-        are NOT a superset of the dominant are kept unchanged.
-
-        This prevents word-level fragmentation that breaks after translation.
-        """
+        """Merge consecutive runs that share a dominant style; emit extras separately."""
         styled = [r for r in runs if r.styles]
         if not styled:
             return []
@@ -377,7 +365,6 @@ class Builder:
                 "_owner": item,
             })
         elif not heading_type and classification.kind == formulas.TEXT_WITH_FORMULA:
-            # Find all equation spans in the paragraph
             all_spans = formulas.extract_all_equations(text)
             if not all_spans:
                 all_spans = [(classification.start, classification.end)]
@@ -424,7 +411,6 @@ class Builder:
         payload["index"] = run.index
         return payload
 
-    # ---------------------------------------------------------------- tables
 
     def _cell_equations(self, cell, table_index, nested_path="") -> list[dict]:
         """One equation per line of a cell, including nested tables inside it."""
@@ -555,7 +541,6 @@ class Builder:
             item["chunk_context_summary"] = ""
         return item, equations
 
-    # ---------------------------------------------------------------- images
 
     @staticmethod
     def _attach_image(item, payload) -> None:
@@ -619,7 +604,6 @@ class Builder:
             "ppi": round(ppi),
         }
 
-    # ----------------------------------------------------------------- utils
 
     def _hash(self, seed: str) -> str:
         candidate = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]

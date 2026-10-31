@@ -1,8 +1,3 @@
-"""Classify blocks as prose / formula / prose-with-formula and extract equations.
-
-Superscript and subscript information comes from the EPUB's own ``<sup>``/``<sub>``
-markup, which is what makes ``e(0.05*1)`` render as ``e^{(0.05*1)}``.
-"""
 from __future__ import annotations
 
 import re
@@ -13,39 +8,22 @@ TEXT = "text"
 FORMULA = "formula"
 TEXT_WITH_FORMULA = "text with formula"
 
-# Characters that are mathematical wherever they appear.
 STRONG_MATH = set("=≈≠≤≥×÷±√∑∫∏≡∝")
-# Characters that are mathematical only between two operands.
 WEAK_OPERATORS = set("+-*/^")
 
 _NUMBER = re.compile(r"^[(\[{]*[\d][\d.,]*[%°]?[)\]}]*[.,;:]?$")
 _SINGLE_LETTER = re.compile(r"^[(\[{]*[A-Za-z][)\]}]*[.,;:]?$")
 _HAS_DIGIT = re.compile(r"\d")
 _CURRENCY = re.compile(r"^(rs\.?|inr|usd|\$|₹|£|€|us)$", re.I)
-# Multiplication written between two numbers is unambiguous; a dash or slash
-# between numbers is usually a range or a date, so it stays weak evidence.
 _TIMES_BETWEEN_NUMBERS = re.compile(r"(?<=\d)\s*[xX*]\s*(?=\d)")
 _ORDINAL = re.compile(r"^(st|nd|rd|th)$", re.I)
-# A superscript holding a bare or square-bracketed integer is a footnote
-# reference. Parenthesised superscripts really are exponents in these books.
 _FOOTNOTE_MARK = re.compile(r"^\[?\d+\]?$")
-# A token made only of operator glyphs: the "+" in "indicator= +".
 _OPERATOR_ONLY = re.compile(r"^[+\-*/^<>=]+$")
-# Brackets and digits are deliberately excluded: "( 0.045*3)" is a real
-# exponent group, whereas a lone "=" inside <sub> is a typographic quirk.
 _OPERATOR_GLYPHS = STRONG_MATH | set("+-*/^<>")
-# Table cells are terser than prose, so a leading operator alone marks an
-# expression: "= 6.5:1", "+100". A leading minus is excluded because it is far
-# more often a negative figure in a returns column than an operation.
 _LEADS_WITH_OPERATOR = re.compile(r"^[=+*/×÷]")
-# ... but a bare span of years or page numbers is a range, not arithmetic.
 _PURE_RANGE = re.compile(r"^\(?\d[\d,.]*\s*-\s*\d[\d,.]*\)?$")
-# Fill-in-the-blank rules in quiz tables are punctuation, not operators.
 _FILL_BLANK = re.compile(r"[-_]{3,}")
-# Digits, fraction slashes and hyphens with no relation sign are a measurement
-# such as "9-1/2" miles, not a calculation.
 _MEASUREMENT = re.compile(r"[\d.,\s/-]+")
-# "3-1/2 miles" is one quantity, so its dash and slash are not two operations.
 _MIXED_FRACTION = re.compile(r"\d+\s*-\s*\d+\s*/\s*\d+")
 
 SYMBOL_LATEX = {
@@ -64,14 +42,13 @@ SYMBOL_LATEX = {
 DASHES = "–—‒―‐−"
 DASH_TABLE = {ord(ch): "-" for ch in DASHES}
 
-# Applied to prompt_text so it matches the reference pipeline's plain-text form.
 PROMPT_MAP = {"×": "x"}
 
 
 @dataclass
 class Classification:
     kind: str
-    start: int = 0          # character span of the formula inside the block text
+    start: int = 0
     end: int = 0
     answer_stripped: bool = False
 
@@ -183,8 +160,6 @@ def _superscript_core(tokens, runs) -> list[bool]:
     return flags
 
 
-# ---------------------------------------------------------------- stop words
-# Words that signal prose boundaries when extracting equations from paragraphs.
 _STOP_WORDS = frozenset({
     "is", "are", "was", "were", "has", "have", "had", "be", "been", "being",
     "does", "did", "do", "will", "would", "can", "could", "should", "shall",
@@ -216,10 +191,8 @@ _STOP_WORDS = frozenset({
 
 _MATH_OPERATORS = frozenset("+-*/=×÷–—±≈≠≤≥−ΔΣ∆→←⇒")
 
-# Greek math symbols recognized as math tokens in equation extraction
 _GREEK_MATH_CHARS = set("ΔΣΘΞΨΩαβγδεθλμπσφψω∆")
 
-# Stop words that ALWAYS break equation span boundaries — never bridge across these
 _EQUATION_BREAKERS = frozenset({
     "then", "if", "since", "because", "when", "where",
     "however", "therefore", "hence", "thus",
@@ -249,16 +222,12 @@ def _is_eq_math_token(tok: str) -> bool:
         return True
     if re.match(r"^\[.*\]$", t) and _HAS_DIGIT.search(t):
         return True
-    # Token starts with a math operator glued to a word: "+Rent", "-Employed"
     if t[0] in _MATH_OPERATORS and len(t) > 1:
         return True
-    # Greek math symbols (Δ, Σ, α, etc.)
     if any(c in _GREEK_MATH_CHARS for c in t):
         return True
-    # Function-call patterns: f(x), sin(30), log(n) — letter followed by parens
     if t[0].isalpha() and '(' in t:
         return True
-    # Embedded operators: "Size*base", "price*", "A+B"
     if any(c in t for c in "*/+"):
         return True
     return False
@@ -270,18 +239,12 @@ def _is_eq_stop(tok: str) -> bool:
 
 
 
-# -------------------------------------------------------- equation extraction
 
 def extract_equation_text(text: str) -> str | None:
-    """Extract the equation substring from a text that contains an embedded formula.
-
-    Returns the equation text as-is (not converted to LaTeX notation).
-    Returns None if no equation is found.
-    """
+    """Extract the equation substring from a text that contains an embedded formula."""
     if "=" not in text:
         return None
 
-    # Normalize dashes so Unicode minus (−) is recognized as operator
     text_norm = text.translate(DASH_TABLE)
     tokens = _tokens(text_norm)
     if not tokens:
@@ -292,7 +255,6 @@ def extract_equation_text(text: str) -> str | None:
         return None
 
     first_eq = eq_indices[0]
-    # Find last = that is not separated from first by a breaker word
     last_eq = first_eq
     for ei in range(1, len(eq_indices)):
         prev_eq = eq_indices[ei - 1]
@@ -307,20 +269,16 @@ def extract_equation_text(text: str) -> str | None:
             break
         last_eq = cur_eq
 
-    # --- LEFT boundary: walk left from first =, stop at stop-words ---
     left = first_eq
     for i in range(first_eq - 1, -1, -1):
         tok = tokens[i][2]
         if tok.endswith(":"):
             break
-        # Comma-ending non-math token is a clause boundary ("economy,", "curve CC,")
         if tok.endswith(",") and not _is_eq_math_token(tok):
             break
         if _is_eq_stop(tok):
-            # Hard breakers always end the equation span
             if tok.strip(".,;:……()[]{}").lower() in _EQUATION_BREAKERS:
                 break
-            # Look further left past stop words for operator-bearing tokens
             found_op_left = False
             for j in range(i - 1, max(i - 5, -1), -1):
                 tj = tokens[j][2]
@@ -342,9 +300,8 @@ def extract_equation_text(text: str) -> str | None:
             break
         left = i
 
-    # --- RIGHT boundary: walk right from last =, using operand absorption ---
     right = last_eq
-    last_was_operator = True   # the = itself is an operator, so absorb next operand
+    last_was_operator = True
 
     for i in range(last_eq + 1, len(tokens)):
         tok = tokens[i][2]
@@ -356,17 +313,13 @@ def extract_equation_text(text: str) -> str | None:
             continue
 
         if _is_eq_stop(tok):
-            # Hard breakers always end the equation span
             if tok.strip(".,;:……()[]{}").lower() in _EQUATION_BREAKERS:
                 break
-            # After an operator, single-letter stop words (a, b, x, y) are
-            # likely variables not articles — absorb them
             cleaned = tok.rstrip(".,;:")
             if last_was_operator and len(cleaned) <= 2:
                 right = i
                 last_was_operator = False
                 continue
-            # Look ahead past stop words for more math
             found_math_ahead = False
             for j in range(i + 1, min(i + 5, len(tokens))):
                 if _is_eq_math_token(tokens[j][2]):
@@ -381,7 +334,6 @@ def extract_equation_text(text: str) -> str | None:
                 continue
             break
 
-        # Non-math, non-stop token — check for breaker word stripped of parens
         bare = tok.strip(".,;:()[]{}").lower()
         if bare in _EQUATION_BREAKERS:
             break
@@ -391,7 +343,6 @@ def extract_equation_text(text: str) -> str | None:
             last_was_operator = False
             continue
 
-        # Not after an operator — check lookahead for more math
         found_math = False
         for j in range(i + 1, min(i + 4, len(tokens))):
             if _is_eq_math_token(tokens[j][2]):
@@ -408,7 +359,6 @@ def extract_equation_text(text: str) -> str | None:
         else:
             break
 
-    # Absorb a trailing unit/label word immediately after the last math token.
     if right + 1 < len(tokens):
         next_word = tokens[right + 1][2].rstrip(".,;:)]}")
         if next_word.lower() in _UNIT_WORDS:
@@ -417,7 +367,6 @@ def extract_equation_text(text: str) -> str | None:
     start_char = tokens[left][0]
     end_char = tokens[right][1]
     result = text[start_char:end_char].strip()
-    # Strip label prefixes like "Justification:NIT" → "NIT", "Answer:Y=5" → "Y=5"
     colon_idx = result.find(":")
     if colon_idx >= 0 and colon_idx < len(result) - 1:
         after_colon = result[colon_idx + 1:].lstrip()
@@ -434,14 +383,8 @@ _BREAKER_SPLIT = re.compile(
 
 
 def extract_all_equations(text: str) -> list[tuple[int, int]]:
-    """Find all equation spans in text. Returns list of (start, end) char offsets.
-
-    Splits on sentence boundaries and breaker words, then finds equations
-    in each segment so a paragraph with multiple equations yields multiple spans.
-    """
-    # First split on sentence boundaries
+    """Find all equation spans in text. Returns list of (start, end) char offsets."""
     sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-    # Then split each sentence on breaker words (then, if, where, etc.)
     segments: list[str] = []
     for sentence in sentences:
         parts = _BREAKER_SPLIT.split(sentence)
@@ -461,7 +404,6 @@ def extract_all_equations(text: str) -> list[tuple[int, int]]:
                 abs_end = abs_start + len(eq)
                 spans.append((abs_start, abs_end))
         offset = idx + len(segment)
-    # Deduplicate overlapping spans
     if len(spans) <= 1:
         return spans
     merged = [spans[0]]
@@ -482,10 +424,7 @@ def strip_equation_label(text: str) -> str:
     return _LABEL_PREFIX.sub("", text)
 
 
-# -------------------------------------------------- latex text normalization
 
-# Greek letters that are ONLY visual lookalikes for Latin in economics EPUBs.
-# Math-symbol Greeks (Δ, Σ, Θ, Ψ, Ω, α, β, γ, etc.) go to _LATEX_CHAR_MAP.
 _GREEK_TO_LATIN = {
     'Α': 'A', 'Β': 'B', 'Γ': 'G', 'Ε': 'E',
     'Ζ': 'Z', 'Η': 'H', 'Ι': 'I', 'Κ': 'K',
@@ -495,9 +434,9 @@ _GREEK_TO_LATIN = {
 }
 
 _LATEX_CHAR_MAP = {
-    '–': '-',    # en-dash
-    '—': '-',    # em-dash
-    '−': '-',    # Unicode minus sign (U+2212)
+    '–': '-',
+    '—': '-',
+    '−': '-',
     '×': ' \\times ',
     '÷': ' \\div ',
     '·': ' \\cdot ',
@@ -515,7 +454,6 @@ _LATEX_CHAR_MAP = {
     '%': '\\%',
     '→': '->',
     '←': '<-',
-    # Greek math symbols → LaTeX commands (matching IDML _SPECIAL_CHAR_MAP)
     'Δ': '\\Delta ',
     '∆': '\\Delta ',
     'Σ': '\\Sigma ',
@@ -631,7 +569,6 @@ def runs_to_latex(text: str, runs, start: int = 0, end: int | None = None) -> st
     return ''.join(parts).strip()
 
 
-# ------------------------------------------------------------ classification
 
 _ANSWER_PREFIX = re.compile(
     r"^(Answer|Solution|Ans|Sol)\s*[:]\s*[-=]?\s*", re.I)
@@ -641,7 +578,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
              coverage_threshold: float = 0.6, lead_words: int = 3,
              table_cell: bool = False) -> Classification:
     """Decide whether a block is prose, a formula, or prose containing a formula."""
-    # Strip Answer:/Solution: prefix — the label is not part of the equation
     label_match = _ANSWER_PREFIX.match(text)
     if label_match and not table_cell:
         stripped = text[label_match.end():]
@@ -682,11 +618,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
     if table_cell and _LEADS_WITH_OPERATOR.match(probe.strip()):
         return Classification(FORMULA, 0, len(text))
 
-    # Definition detection: "X = long prose description" → TEXT
-    # If every = sign has only prose words after it (no numbers,
-    # operators, or Greek), it's a definition not a formula.
-    # Skipped for table cells — table lines like "= Current assets/current
-    # liabilities" are calculations, not definitions.
     if not table_cell:
         eq_tok_indices = [i for i, (_, _, t) in enumerate(tokens) if '=' in t.rstrip(".,;:")]
         if eq_tok_indices:
@@ -729,7 +660,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
 
     left, right = best
 
-    # Coverage for FORMULA decision uses only the core+adjacent span
     core_coverage = (right - left + 1) / len(tokens)
 
     if core_coverage >= coverage_threshold:
@@ -737,7 +667,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
     if first_core <= lead_words and len(tokens) <= max_formula_words:
         stop_count = sum(1 for _, _, t in tokens if _is_eq_stop(t))
         if stop_count <= len(tokens) // 3:
-            # Verify right side of = has actual math (not just prose)
             fc_eq = next((i for i, (_, _, t) in enumerate(tokens) if '=' in t.rstrip(".,;:")), None)
             if fc_eq is not None:
                 has_mr = any(_is_eq_math_token(tokens[j][2])
@@ -747,22 +676,17 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
             else:
                 return Classification(FORMULA, 0, len(text))
 
-    # Short text with = and few stop words → likely a formula name = value
-    # e.g. "National Income at constant price = 60,000" (1 stop total)
-    # vs "If indicator= + appears it shows the favourable trend." (5 stops → prose)
     if len(tokens) <= 20 and not re.search(r'\.\s+[A-Z]', text):
         eq_tok = next((i for i, (_, _, t) in enumerate(tokens) if "=" in t), None)
         if eq_tok is not None:
             stops_before = sum(1 for j in range(eq_tok)
                                if _is_eq_stop(tokens[j][2]))
             total_stops = sum(1 for _, _, t in tokens if _is_eq_stop(t))
-            # Verify right side has actual math content (numbers, operators, Greek)
             has_math_r = any(_is_eq_math_token(tokens[j][2])
                              for j in range(eq_tok + 1, len(tokens)))
             if stops_before <= 2 and total_stops <= 4 and eq_tok <= 6 and has_math_r:
                 return Classification(FORMULA, 0, len(text))
 
-    # Expand span to absorb word-operands (economics-style equations)
     exp_left, exp_right = left, right
     while exp_left - 1 >= 0:
         if _is_eq_stop(tokens[exp_left - 1][2]):
@@ -773,9 +697,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
             break
         exp_right += 1
 
-    # Multi-operator equations spanning most of the text are formulas.
-    # Count operator tokens directly — _core_positions misses standalone +/-
-    # between word-operands (economics equations like "Wages + Rent + profit").
     op_indices = []
     for idx_t, (_, _, t) in enumerate(tokens):
         ts = t.rstrip(".,;:")
@@ -788,7 +709,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
 
     left, right = exp_left, exp_right
 
-    # For TEXT_WITH_FORMULA, use the dedicated equation extractor for better spans
     eq_text = extract_equation_text(text)
     if eq_text:
         start = text.find(eq_text)
@@ -799,7 +719,6 @@ def classify(text: str, runs=None, max_formula_words: int = 15,
     return Classification(TEXT_WITH_FORMULA, tokens[left][0], tokens[right][1])
 
 
-# --------------------------------------------------------------------- LaTeX
 
 
 def to_latex(text: str, runs=None, start: int = 0, end: int | None = None,

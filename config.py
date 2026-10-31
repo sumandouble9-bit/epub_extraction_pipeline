@@ -1,7 +1,3 @@
-"""Centralized configuration for EPUB-to-JSON extraction pipeline.
-
-All paths are loaded from .env file. To change paths, edit .env (not this file).
-"""
 import os
 from pathlib import Path
 
@@ -25,13 +21,9 @@ def _load_env():
 
 _load_env()
 
-# --- Network paths (from .env) ---
-# Fallback to local "input"/"output" if .env not set
 DEFAULT_INPUT_DIR = os.environ.get("EPUB_INPUT_DIR", "\\\\192.168.4.28\\Common\\Suman Kumar\\2 file")
 DEFAULT_OUTPUT_DIR = os.environ.get("EPUB_OUTPUT_DIR", "\\\\192.168.4.28\\Common\\Suman Kumar\\50_files_json")
 
-# --- ISBN filter Excel sheet (from .env) ---
 ISBN_FILTER_EXCEL = os.environ.get("ISBN_FILTER_EXCEL", "")
 
-# --- Column name in Excel for ISBN (from .env) ---
 ISBN_COLUMN = os.environ.get("ISBN_COLUMN", "eisbn")

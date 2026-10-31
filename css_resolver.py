@@ -1,8 +1,3 @@
-"""A small CSS cascade resolver.
-
-Only the subset of CSS that EPUBs actually use for text formatting is supported:
-type / class / id selectors combined with descendant and child combinators.
-"""
 from __future__ import annotations
 
 import re
@@ -22,7 +17,6 @@ _SIMPLE = re.compile(
     re.X,
 )
 
-# Properties that cascade down to descendants.
 INHERITED = {
     "font-weight", "font-style", "font-variant", "font-variant-caps",
     "text-transform", "font-size", "font-family", "text-align",

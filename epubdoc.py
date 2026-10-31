@@ -1,4 +1,3 @@
-"""EPUB container access: spine order, manifest, stylesheets and resources."""
 from __future__ import annotations
 
 import posixpath
@@ -26,7 +25,6 @@ class Epub:
         self.manifest = self._read_manifest(opf)
         self.spine = self._read_spine(opf)
 
-    # ---------------------------------------------------------------- reading
 
     def _find_opf(self) -> str:
         try:
@@ -75,7 +73,6 @@ class Epub:
             docs = [i for i in self.manifest.values() if i["media_type"] in XHTML_MEDIA]
         return docs
 
-    # ------------------------------------------------------------- resources
 
     @staticmethod
     def resolve(base_dir: str, href: str) -> str:

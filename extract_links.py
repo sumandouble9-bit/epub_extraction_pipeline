@@ -1,7 +1,3 @@
-"""Extract all links (footnotes, references, etc.) from an EPUB and map to message_index.
-
-Outputs a JSON array with fields: message_index, link_id, href_link, text
-"""
 import json
 import os
 import posixpath
@@ -12,11 +8,7 @@ from epubdoc import Epub
 
 
 def _resolve_href(href, doc_path):
-    """Resolve a relative href to the full EPUB document path (no fragment).
-
-    '#fn-3' in 'OEBPS/xhtml/chapter6.xhtml' -> 'OEBPS/xhtml/chapter6.xhtml'
-    'chapter7.xhtml#x' in 'OEBPS/xhtml/chapter6.xhtml' -> 'OEBPS/xhtml/chapter7.xhtml'
-    """
+    """Resolve a relative href to the full EPUB document path (no fragment)."""
     if not href or href.startswith("mailto:") or href.startswith("http"):
         return href
     if href.startswith("javascript:"):
@@ -172,10 +164,6 @@ def extract_links(epub_path, text_json_path=None):
 
 
 from config import DEFAULT_INPUT_DIR, DEFAULT_OUTPUT_DIR
-# DEFAULT_INPUT_DIR = "input"
-# DEFAULT_OUTPUT_DIR = "output"
-# DEFAULT_INPUT_DIR = r"\\192.168.4.28\Common\Uday\3698 Files\Output epub"
-# DEFAULT_OUTPUT_DIR = r"\\192.168.4.28\Common\Suman Kumar\extracted_epub_josn_files1"
 
 
 def main():

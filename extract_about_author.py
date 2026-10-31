@@ -1,9 +1,3 @@
-"""Extract 'About the Author' content from an EPUB into *_about_author.json.
-
-Output format matches *_text.json: each paragraph is a separate JSON object
-with type, applied_style, psr_id, token_count, prompt_text, runs (bold,
-italic, allcaps, etc.), and message_index.
-"""
 from __future__ import annotations
 
 import json

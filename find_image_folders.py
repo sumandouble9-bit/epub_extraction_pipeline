@@ -1,12 +1,6 @@
-"""Scan extracted EPUB output folders and report which have an images subfolder.
-
-Usage:
-    python find_image_folders.py
-"""
 import os
 
 from config import DEFAULT_OUTPUT_DIR
-# OUTPUT_DIR = r"\\192.168.4.28\Common\Suman Kumar\extracted_epub_josn_files"
 OUTPUT_DIR = DEFAULT_OUTPUT_DIR
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image_folders_report.log")
 

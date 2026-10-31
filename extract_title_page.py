@@ -1,9 +1,3 @@
-"""Extract title page data from EPUB files into separate JSON.
-
-Usage:
-    python extract_title_page.py book1.epub book2.epub ...
-    python extract_title_page.py                          # all EPUBs from DEFAULT_INPUT_DIR
-"""
 from __future__ import annotations
 
 import json
@@ -17,10 +11,6 @@ from epubdoc import Epub
 
 XHTML_NS = "http://www.w3.org/1999/xhtml"
 from config import DEFAULT_INPUT_DIR, DEFAULT_OUTPUT_DIR
-# DEFAULT_INPUT_DIR = "input"
-# DEFAULT_OUTPUT_DIR = "output"
-# DEFAULT_INPUT_DIR = r"\\192.168.4.28\Common\Uday\3698 Files\Output epub"
-# DEFAULT_OUTPUT_DIR = r"\\192.168.4.28\Common\Suman Kumar\extracted_epub_josn_files1"
 
 TITLE_CLASSES = {
     "title", "subtitle", "author", "booktitle", "book-title",
@@ -228,21 +218,10 @@ def _clean_runs(runs: list[dict]) -> list[dict]:
 
 
 def _title_doc_candidates(epub: Epub) -> list[tuple]:
-    """Return title-page candidate (root, path) pairs in priority order.
-
-    Priority 1: documents whose filename looks like a title page
-    (``titlepage``, ``halftitle`` ...).
-    Priority 2: documents carrying title-page CSS classes (``title``,
-    ``author`` ...).
-
-    Both groups are returned, in that order, so ``extract_title_page`` can
-    fall through from an empty candidate (e.g. a cover-image-only
-    ``titlepage.xhtml``) to the next one (e.g. ``index_split_000.html``).
-    """
+    """Return title-page candidate (root, path) pairs in priority order."""
     candidates: list[tuple] = []
     seen: set[str] = set()
 
-    # Priority 1: filename hints.
     for doc in epub.spine[:6]:
         fname = os.path.splitext(os.path.basename(doc["path"]))[0].lower()
         if fname in TITLE_FILENAME_HINTS or "title" in fname:
@@ -253,7 +232,6 @@ def _title_doc_candidates(epub: Epub) -> list[tuple]:
                 seen.add(doc["path"])
                 candidates.append((root, doc["path"]))
 
-    # Priority 2: title-page CSS classes.
     for doc in epub.spine[:6]:
         if doc["path"] in seen:
             continue
@@ -346,21 +324,7 @@ def _extract_items(epub: Epub, root, doc_path: str) -> list[dict]:
 
 
 def extract_title_page(epub: Epub) -> tuple[list[dict], str | None]:
-    """Extract the title page and report which source file it came from.
-
-    Returns ``(items, source_filename)``. Candidates are tried in priority
-    order (see ``_title_doc_candidates``) and the first one that yields
-    content wins, so:
-
-    * if the filename-matched doc (e.g. ``titlepage.xhtml``) has title text,
-      it is used -- preserving the behaviour for books like 42_9788167688521;
-    * else if it is empty (cover image only), the next candidate carrying
-      ``title``/``author`` classes (e.g. ``index_split_000.html``) is used --
-      fixing books like 9789356560024.
-
-    ``source_filename`` is stored as ``metadata`` in the title JSON so the
-    originating document is identifiable when the EPUB is rebuilt.
-    """
+    """Extract the title page and report which source file it came from."""
     for root, doc_path in _title_doc_candidates(epub):
         items = _extract_items(epub, root, doc_path)
         if items:

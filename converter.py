@@ -242,7 +242,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
     items = result.items
     equations = result.equations
 
-    # --- char_style analysis ---
     items_with_runs = 0
     items_without_runs = 0
     no_runs_details = []
@@ -280,7 +279,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
                 "text": text_sample,
             })
 
-    # --- table char_style analysis ---
     tables_with_runs = 0
     tables_without_runs = 0
     for item in items:
@@ -301,7 +299,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
         f.write("Profile : %s\n" % profile.data.get("name", "default"))
         f.write("\n")
 
-        # --- Item counts ---
         f.write("-" * 90 + "\n")
         f.write("ITEM COUNTS\n")
         f.write("-" * 90 + "\n")
@@ -318,7 +315,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
         f.write("  images          : %d\n" % stats.get("images", 0))
         f.write("\n")
 
-        # --- Equation Refinement ---
         eq_log = log_data.get("equations", {})
         f.write("-" * 90 + "\n")
         f.write("EQUATION REFINEMENT (LLM)\n")
@@ -344,7 +340,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
                             % (entry["eq_index"], entry["reason"], entry["latex"]))
                 if len(eq_failures) > 50:
                     f.write("  ... and %d more\n" % (len(eq_failures) - 50))
-        # --- Equation Port Health ---
         eq_ph = log_data.get("eq_port_health")
         if eq_ph:
             f.write("  Ports UP  : %s\n" % ", ".join(str(p) for p in eq_ph["up"]))
@@ -360,7 +355,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
                 f.write("    ... and %d more\n" % (len(eq_shifts) - 100))
         f.write("\n")
 
-        # --- Context Summary ---
         sum_log = log_data.get("summaries", {})
         f.write("-" * 90 + "\n")
         f.write("CHUNK CONTEXT SUMMARY (LLM)\n")
@@ -376,7 +370,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
             f.write("  Workers         : %d\n" % sum_log.get("workers", 0))
             f.write("  Time            : %.1fs\n" % sum_log.get("elapsed_s", 0))
 
-        # --- Summary Port Health ---
         sum_ph = log_data.get("port_health")
         if sum_ph:
             f.write("  Ports UP  : %s\n" % ", ".join(str(p) for p in sum_ph["up"]))
@@ -417,7 +410,6 @@ def _write_extraction_log(out_dir, name, epub_path, profile, result, stats, log_
                     f.write("  ... and %d more\n" % (len(sum_failures) - 100))
         f.write("\n")
 
-        # --- char_style analysis ---
         f.write("-" * 90 + "\n")
         f.write("CHAR_STYLE (RUNS) ANALYSIS\n")
         f.write("-" * 90 + "\n")
@@ -459,10 +451,6 @@ def _book_name(epub: Epub, path: str, override: str | None) -> str:
     return stem
 
 
-# DEFAULT_INPUT_DIR = "input"
-# DEFAULT_OUTPUT_DIR = "output"
-# DEFAULT_INPUT_DIR = r"\\192.168.4.28\Common\Uday\3698 Files\Output epub"
-# DEFAULT_OUTPUT_DIR = r"\\192.168.4.28\Common\Suman Kumar\extracted_epub_josn_files1"
 
 
 def _download_google_sheet(url: str) -> str:
@@ -489,11 +477,7 @@ def _download_google_sheet(url: str) -> str:
 
 
 def _load_isbn_filter(excel_path: str) -> tuple[set[str], set[str]] | None:
-    """Read Excel/Google Sheet and return (spanish_isbns, all_eng_isbns).
-
-    spanish_isbns: ENG ISBNs that have a Spanish counterpart (extract first).
-    all_eng_isbns: all ENG ISBNs in the sheet.
-    """
+    """Read Excel/Google Sheet and return (spanish_isbns, all_eng_isbns)."""
     if not excel_path:
         return None
 
@@ -502,7 +486,6 @@ def _load_isbn_filter(excel_path: str) -> tuple[set[str], set[str]] | None:
     if is_url:
         local_path = _download_google_sheet(excel_path)
         if not local_path:
-            # fallback = r"C:\Users\User\Downloads\Spanish Data_2000_ISBN.xlsx"
             fallback = ISBN_FILTER_EXCEL
             if os.path.isfile(fallback):
                 print("Using local fallback: %s" % fallback)
@@ -609,7 +592,6 @@ def cmd_convert(args) -> int:
         print("Extraction order: %d Spanish ISBN (priority) + %d other = %d total"
               % (len(spanish_paths), len(other_paths), len(paths)))
 
-        # Log mismatches: EPUBs not in Excel, and Excel ISBNs without EPUB files
         not_in_excel = all_stems - all_eng_isbns
         not_in_input_spanish = spanish_isbns - all_stems
         not_in_input_other = (all_eng_isbns - spanish_isbns) - all_stems
@@ -644,7 +626,6 @@ def cmd_convert(args) -> int:
         existing_title = os.path.join(base_out, name_check, "%s_title.json" % name_check)
         existing_links = os.path.join(base_out, name_check, "%s_links.json" % name_check)
         if os.path.isfile(existing_json):
-            # --- backfill empty summaries ---
             if not args.no_summary:
                 try:
                     with open(existing_json, "r", encoding="utf-8") as f:
@@ -664,7 +645,6 @@ def cmd_convert(args) -> int:
                             remaining = _count_empty_summaries(items)
                             print("   summaries filled -> %s (remaining empty: %d)"
                                   % (os.path.basename(existing_json), remaining))
-                            # update CSV with new empty count
                             csv_rows = _read_csv_log(csv_path)
                             if name_check in csv_rows:
                                 csv_rows[name_check]["empty_summary_count"] = remaining
@@ -676,7 +656,6 @@ def cmd_convert(args) -> int:
                             break
                 except Exception as e:
                     print("%s -> summary backfill failed: %s" % (name_check, e))
-            # --- backfill missing title ---
             if not os.path.isfile(existing_title):
                 try:
                     epub_t = Epub(path)
@@ -688,7 +667,6 @@ def cmd_convert(args) -> int:
                               % (name_check, len(title_items), title_source))
                 except Exception as e:
                     print("%s -> title backfill failed: %s" % (name_check, e))
-            # --- backfill missing links ---
             if not os.path.isfile(existing_links):
                 try:
                     link_items = extract_links(path, existing_json)
@@ -698,7 +676,6 @@ def cmd_convert(args) -> int:
                               % (name_check, len(link_items)))
                 except Exception as e:
                     print("%s -> links backfill failed: %s" % (name_check, e))
-            # --- backfill missing about_author ---
             existing_about = os.path.join(base_out, name_check, "%s_about_author.json" % name_check)
             if not os.path.isfile(existing_about):
                 try:
@@ -844,7 +821,6 @@ def cmd_convert(args) -> int:
         _append_csv_row(csv_path, _csv_row_from_stats(
             name, stats, result, has_title, elapsed_sec=_book_elapsed))
 
-    # --- Image folder report ---
     _write_image_folder_report(base_out)
 
     total_minutes = (_time.time() - _convert_start) / 60

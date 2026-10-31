@@ -1,10 +1,3 @@
-"""Learn a style profile by aligning an EPUB against a reference JSON.
-
-The reference JSONs were produced from InDesign (IDML) sources, so they carry
-style names such as ``ParagraphStyle/body_text`` that no longer exist in the
-EPUB. Aligning the two documents recovers the mapping, which can then be reused
-for every other book built with the same template.
-"""
 from __future__ import annotations
 
 import collections
@@ -96,8 +89,6 @@ def learn_profile(epub_path: str, reference_path: str, equations_path: str | Non
     for key, counter in para_votes.items():
         style, votes = counter.most_common(1)[0]
         total = sum(counter.values())
-        # A key seen once with a single unanimous answer still beats guessing a
-        # style name from the CSS class, which is the only alternative.
         if (votes >= min_support or total == 1) and votes / total >= min_confidence:
             paragraph_styles[key] = style
 
@@ -115,7 +106,6 @@ def learn_profile(epub_path: str, reference_path: str, equations_path: str | Non
         if votes >= min_support and votes / total >= min_confidence:
             char_styles[combo] = value
 
-    # Flags carried by the character style itself rather than by inline markup.
     char_style_implies = {}
     for idml, flags in implied_votes.items():
         total = implied_totals[idml]
@@ -123,7 +113,6 @@ def learn_profile(epub_path: str, reference_path: str, equations_path: str | Non
         if always:
             char_style_implies[idml] = list(always)
 
-    # Does the reference record allcaps on blocks the EPUB left as plain uppercase?
     allcaps_hits = allcaps_total = 0
     for block, item in pairs:
         if block.kind != "para":
@@ -136,11 +125,7 @@ def learn_profile(epub_path: str, reference_path: str, equations_path: str | Non
             allcaps_hits += 1
     infer_allcaps = allcaps_total > 0 and allcaps_hits / allcaps_total >= 0.5
 
-    # An IDML paragraph style carries its own weight and slant, but the EPUB
-    # export usually restates them in CSS. Where the reference omits a flag the
-    # CSS asserts for a whole block, that flag belongs to the paragraph style.
     baseline_votes = collections.defaultdict(collections.Counter)
-    # Paragraphs styled uniformly end to end may map to a style of their own.
     run_style_votes = collections.defaultdict(collections.Counter)
     run_style_agreed = collections.Counter()
     for block, item in pairs:
@@ -186,16 +171,10 @@ def learn_profile(epub_path: str, reference_path: str, equations_path: str | Non
     for combo, counter in run_style_votes.items():
         style, votes = counter.most_common(1)[0]
         total = sum(counter.values())
-        # A single flag such as plain bold is far too common to imply a
-        # paragraph style, so only distinctive combinations qualify, they have
-        # to be near-unanimous, and the tag-based rule has to be wrong nearly
-        # every time - otherwise the override does more harm than good.
         if (combo.count("+") >= 1 and votes >= min_support
                 and votes / total >= 0.9 and run_style_agreed[combo] / total <= 0.1):
             run_style_paragraph_styles[combo] = style
 
-    # The reference escapes LaTeX in table cells but keeps paragraph formulas as
-    # the author typed them, so the two contexts are measured separately.
     def _latex_style(entries) -> str:
         escaped = plain = 0
         for entry in entries:

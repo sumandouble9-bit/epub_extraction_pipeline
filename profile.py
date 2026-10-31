@@ -1,8 +1,3 @@
-"""Style profiles: map EPUB tags/classes onto InDesign-style style names.
-
-A profile is a small JSON file. ``learn.py`` can generate one automatically by
-aligning an EPUB against a reference JSON produced by the original IDML pipeline.
-"""
 from __future__ import annotations
 
 import json
@@ -14,26 +9,15 @@ PROFILE_DIR = os.path.join(os.path.dirname(__file__), "profiles")
 
 DEFAULT_PROFILE = {
     "name": "default",
-    # EPUB filename fragments this profile was learned from, so a batch run can
-    # pick the right profile per book instead of one profile for everything.
     "books": [],
     "paragraph_style_template": "ParagraphStyle/{key}",
     "paragraph_styles": {},
     "headings": {},
     "char_styles": {},
-    # An InDesign character style can imply formatting that the EPUB does not
-    # repeat inline; these flags are unioned back into char_style.
     "char_style_implies": {},
-    # InDesign bakes its all-caps attribute into the exported EPUB text, so a
-    # fully uppercase block keeps no inline markup to detect.
     "infer_allcaps": True,
-    # Flags the CSS asserts for a whole block but that the IDML paragraph style
-    # already owns, so they must not be repeated on the run.
     "base_style_overrides": {},
-    # Paragraph styles chosen by how the whole paragraph is styled rather than
-    # by its tag or class, e.g. an entirely bold+italic+underline paragraph.
     "run_style_paragraph_styles": {},
-    # "latex" escapes for real LaTeX; "plain" keeps x and % as typed.
     "latex_style": "latex",
     "table_latex_style": "latex",
     "heading_split": None,
@@ -54,7 +38,6 @@ class Profile:
         self.char_style_implies: dict[str, list] = merged.get("char_style_implies") or {}
         self.template: str = merged.get("paragraph_style_template") or "ParagraphStyle/{key}"
 
-    # ------------------------------------------------------------ factories
 
     @classmethod
     def load(cls, name_or_path: str | None) -> "Profile":
@@ -73,7 +56,6 @@ class Profile:
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(self.data, handle, ensure_ascii=False, indent=2)
 
-    # -------------------------------------------------------------- lookups
 
     @staticmethod
     def style_keys(block) -> list[str]:
@@ -115,14 +97,10 @@ class Profile:
         return self.char_styles.get("+".join(styles))
 
     def resolve_run(self, styles) -> tuple[tuple[str, ...], str | None]:
-        """Return the char_style list and optional InDesign name for an exact match.
-
-        Styles come straight from the EPUB; nothing is added or removed here.
-        """
+        """Return the char_style list and optional InDesign name for an exact match."""
         ordered = order_styles(styles)
         return ordered, self.char_style(ordered)
 
-    # ------------------------------------------------------------- settings
 
     @property
     def infer_allcaps(self) -> bool:

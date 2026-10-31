@@ -1,8 +1,3 @@
-"""Generate chunk_context_summary via the llama-server GPU array.
-
-Same model, same ports, same prompts as the IDML extraction pipeline
-(idmls_latex_extraction/main.py).
-"""
 from __future__ import annotations
 
 import json
@@ -18,7 +13,6 @@ SERVER_IP = "103.181.20.53"
 LLAMA_URLS = [f"http://{SERVER_IP}:{port}/v1/chat/completions" for port in PORTS]
 LLAMA_WORKERS = len(LLAMA_URLS) * 8
 
-# Populated at runtime by add_chunk_summaries health check; fallback to all
 _healthy_urls: list[str] = []
 _port_shift_log: list[str] = []
 
@@ -183,7 +177,6 @@ def _clean_summary(summary: str) -> str:
     s = re.sub(r"</?\w[^>]*>", "", summary).strip()
     s = s.split("\n")[0].strip()
     s = re.sub(r"^(Summary|Answer|Main point):\s*", "", s, flags=re.IGNORECASE).strip()
-    # Strip robotic openers
     s = re.sub(
         r"^(The main point being made (here |in the passage )?is that |"
         r"The main point of (this passage|the passage) is that |"
@@ -198,7 +191,6 @@ def _clean_summary(summary: str) -> str:
         rest = s[m.end():].lstrip(" ,;:")
         if rest:
             s = rest[0].upper() + rest[1:]
-    # Detect repetition loops (same 5+ word phrase repeated 3+ times)
     words = s.split()
     if len(words) > 20:
         for n in range(5, min(15, len(words)//3)):
@@ -218,7 +210,6 @@ def _is_verbatim(summary: str, source: str) -> bool:
     if len(s_words) < 5 or len(src_words) < 5:
         return False
     src_str = " ".join(src_words)
-    # Check longest common substring of 6+ words
     matches = 0
     for i in range(len(s_words) - 5):
         phrase = " ".join(s_words[i:i+6])
@@ -278,8 +269,6 @@ def _llama_summary(args) -> tuple[int, str]:
     text_clean = text.strip()
     word_count = len(text_clean.split())
 
-    # Context: only for short chunks (<=30 words) and headings — longer chunks
-    # have enough self-context, and passing neighbors causes bleed.
     if word_count <= 30 or block_type == "heading":
         prev_clean = prev_text.strip()[-120:]
         next_clean = next_text.strip()[:120]
@@ -314,7 +303,6 @@ def _llama_summary(args) -> tuple[int, str]:
             f"{text_clean}\n\nAnswer:"
         )
     elif word_count <= 8:
-        # Very short fragments — rely heavily on context
         system_msg = "You explain what short text fragments mean in their surrounding context."
         user_msg = (
             f"Short fragment: \"{text_clean}\"\n\n"
@@ -395,7 +383,6 @@ def _llama_summary(args) -> tuple[int, str]:
                     raw = re.sub(r"^(Answer|Summary|Main point):\s*", "", raw, flags=re.IGNORECASE).strip()
                     summary = _clean_summary(raw)
 
-                # Verbatim check — if >50% copied, retry with stricter prompt
                 if _is_verbatim(summary, text_clean) and attempt < max_retries - 1:
                     retry_sys, retry_usr = _make_retry_prompt(text_clean, word_count)
                     retry_payload = json.dumps({
@@ -441,10 +428,7 @@ def add_chunk_summaries(items: list[dict], *, skip: bool = False,
                         log_data: dict | None = None,
                         only_empty: bool = False,
                         batch: bool = False) -> None:
-    """Fill chunk_context_summary on every item that has the field.
-
-    If only_empty=True, only targets items where the field is empty/blank.
-    """
+    """Fill chunk_context_summary on every item that has the field."""
     if log_data is None:
         log_data = {}
 
