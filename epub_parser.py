@@ -34,7 +34,29 @@ TAG_STYLES = {
 }
 
 _WS = re.compile(r"\s+")
-_BR = "\n"
+
+# The newline character used inside assembled block text.
+_NL = "\n"
+
+
+class _HardBreak:
+    """Unique sentinel marking a real ``<br/>`` in the inline chunk stream.
+
+    It must NOT be a plain ``"\\n"`` string: pretty-printed EPUB markup leaves
+    incidental newlines in element text/tails, and if the sentinel were equal
+    to those the assembler would count each of them as a line break (turning a
+    single ``<br/>`` into ``\\n\\n\\n``). As a distinct object, only genuine
+    ``<br/>`` elements produce a break; formatting whitespace collapses to a
+    space like any other whitespace.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self):  # pragma: no cover - debugging aid
+        return "<BR>"
+
+
+_BR = _HardBreak()
 
 _UL_TYPES = {"disc", "circle", "square", "none"}
 _OL_TYPES = {"decimal", "lower-alpha", "upper-alpha", "lower-roman",
@@ -519,15 +541,32 @@ class DocumentExtractor:
         spans: list[tuple[int, int, frozenset]] = []
         length = 0
         for raw, styles in chunks:
-            if raw == _BR:
-                pieces.append(_BR)
+            if raw is _BR:
+                # Drop whitespace emitted just before the break so the two
+                # lines join cleanly (no trailing " " before the newline).
+                while pieces and pieces[-1].endswith(" "):
+                    s, e, st = spans[-1]
+                    if e - 1 > s:
+                        spans[-1] = (s, e - 1, st)
+                        pieces[-1] = pieces[-1][:-1]
+                        length -= 1
+                        break
+                    spans.pop()
+                    pieces.pop()
+                    length -= 1
+                pieces.append(_NL)
                 spans.append((length, length + 1, styles))
                 length += 1
                 continue
             piece = _WS.sub(" ", raw)
             if not piece:
                 continue
-            if piece.startswith(" ") and (length == 0 or pieces[-1].endswith(" ")):
+            # Suppress a leading space at the very start, after another space,
+            # or immediately after a hard break.
+            if piece.startswith(" ") and (
+                    length == 0
+                    or pieces[-1].endswith(" ")
+                    or pieces[-1].endswith(_NL)):
                 piece = piece[1:]
             if not piece:
                 continue
@@ -603,7 +642,7 @@ class DocumentExtractor:
         shared = dict(doc=self.doc_path, tag=tag, classes=classes,
                       li_depth=li_depth, base_styles=styles, align=align)
 
-        if _BR not in text:
+        if _NL not in text:
             spans = self._merge_spans(text, spans)
             return [Block(kind="para", text=text,
                           runs=self._make_runs(text, spans, styles),
@@ -612,7 +651,7 @@ class DocumentExtractor:
         out: list[Block] = []
         line_start = 0
         for pos, ch in enumerate(text):
-            if ch != _BR:
+            if ch != _NL:
                 continue
             segment = text[line_start:pos]
             if segment.strip():
