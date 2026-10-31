@@ -1,0 +1,44 @@
+{
+  "name": "double9",
+  "books": [
+    "Financial Markets Management Class XII"
+  ],
+  "paragraph_style_template": "ParagraphStyle/{key}",
+  "paragraph_styles": {
+    "h1.chaptitle": "ParagraphStyle/chapter_name",
+    "li@1": "ParagraphStyle/Bullet_01",
+    "p.block": "ParagraphStyle/quotes_normal",
+    "p.block1": "ParagraphStyle/block1",
+    "p.block5": "ParagraphStyle/Bullet_02",
+    "p.box1": "ParagraphStyle/body_text",
+    "p.center": "ParagraphStyle/centre_align",
+    "p.head1": "ParagraphStyle/chapter_name01",
+    "p.indent": "ParagraphStyle/body_text",
+    "p.noindent": "ParagraphStyle/body_text"
+  },
+  "headings": {
+    "h1.chaptitle": "h1",
+    "p.head1": "h2"
+  },
+  "char_styles": {
+    "bold": "CharacterStyle/boldtext",
+    "bold+allcaps": "CharacterStyle/boldtext",
+    "bold+italic": "CharacterStyle/underlinalign",
+    "bold+italic+underline": "CharacterStyle/underlinalign",
+    "bold+italic+underline+allcaps": "CharacterStyle/underlinalign",
+    "bold+underline": "CharacterStyle/underlinalign",
+    "italic": "CharacterStyle/italic",
+    "italic+underline": "CharacterStyle/underlinalign",
+    "underline": "CharacterStyle/underlinalign"
+  },
+  "char_style_implies": {},
+  "infer_allcaps": true,
+  "base_style_overrides": {},
+  "run_style_paragraph_styles": {},
+  "latex_style": "plain",
+  "table_latex_style": "plain",
+  "heading_split": null,
+  "message_index_start": 10,
+  "emit_chunk_context_summary": true,
+  "image_path_template": "output\\images\\{book}\\{name}"
+}

@@ -1,0 +1,34 @@
+{
+  "name": "prairie",
+  "books": [
+    "The Prairie Traveler"
+  ],
+  "paragraph_style_template": "ParagraphStyle/{key}",
+  "paragraph_styles": {
+    "figcaption": "ParagraphStyle/Fig_Caption",
+    "h1.chaptitle": "ParagraphStyle/chapter_name",
+    "p.block": "ParagraphStyle/quotes_normal",
+    "p.center": "ParagraphStyle/Fig_Caption",
+    "p.head1": "ParagraphStyle/chapter_name01",
+    "p.indent": "ParagraphStyle/body_text"
+  },
+  "headings": {
+    "h1.chaptitle": "h1",
+    "p.head1": "h2"
+  },
+  "char_styles": {
+    "bold": "CharacterStyle/boldtext",
+    "bold+allcaps": "CharacterStyle/Forced Bold",
+    "italic": "CharacterStyle/italic"
+  },
+  "char_style_implies": {},
+  "infer_allcaps": true,
+  "base_style_overrides": {},
+  "run_style_paragraph_styles": {},
+  "latex_style": "latex",
+  "table_latex_style": "latex",
+  "heading_split": null,
+  "message_index_start": 8,
+  "emit_chunk_context_summary": true,
+  "image_path_template": "output\\images\\{book}\\{name}"
+}

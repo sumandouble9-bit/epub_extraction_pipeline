@@ -1,0 +1,24 @@
+{
+  "name": "default",
+  "paragraph_style_template": "ParagraphStyle/{key}",
+  "paragraph_styles": {
+    "li@1": "ParagraphStyle/Bullet_01",
+    "li@2": "ParagraphStyle/Bullet_02",
+    "li@3": "ParagraphStyle/Bullet_03"
+  },
+  "headings": {
+    "h1.chaptitle": "h1",
+    ".chaptitle": "h1",
+    "p.head1": "h2",
+    ".head1": "h2",
+    "p.head2": "h3",
+    ".head2": "h3",
+    "p.head3": "h4",
+    ".head3": "h4"
+  },
+  "char_styles": {},
+  "heading_split": null,
+  "message_index_start": 10,
+  "emit_chunk_context_summary": true,
+  "image_path_template": "output\\images\\{book}\\{name}"
+}
