@@ -782,7 +782,7 @@ class DocumentExtractor:
 
 
 _ABOUT_AUTHOR = re.compile(
-    r"about\s+the\s+author|author\s+bio|biography", re.I)
+    r"about\s+the\s+(?:author|translator|editor)s?|author\s+bio\b", re.I)
 
 
 _TITLE_PAGE_CLASSES = {"title", "booktitle", "book-title", "halftitle"}
@@ -809,6 +809,39 @@ _COPYRIGHT_TEXT = re.compile(
     r"isbn\b|no part of this (?:publication|book) may be reproduced",
     re.I)
 _TOC_HEADING = re.compile(r"^\s*(?:table of\s+)?contents\s*$", re.I)
+
+
+def doc_stem(path: str) -> str:
+    """Lower-cased filename of a document without directory or extension."""
+    return os.path.splitext(os.path.basename(path))[0].lower()
+
+
+def is_about_author_filename(path: str) -> bool:
+    """True when the filename names an 'about the author' document (bio ...)."""
+    return doc_stem(path) in _ABOUT_AUTHOR_FILENAME_HINTS
+
+
+def iter_heading_texts(root):
+    """Yield the text of each heading (h1-h6) in a parsed document."""
+    for el in root.iter():
+        if local_name(el.tag) in HEADING_TAGS:
+            yield ((el.text or "") + "".join(
+                c.text or "" for c in el.iter() if c is not el)).strip()
+
+
+def is_about_author_doc(epub, path: str, root=None) -> bool:
+    """Identify the 'about the author' page by filename, then exact heading.
+
+    Filename is the primary signal so a chapter whose title merely contains a
+    word like "biography" is never mistaken for it.
+    """
+    if is_about_author_filename(path):
+        return True
+    if root is None:
+        root = epub.parse_xhtml(path)
+    if root is None:
+        return False
+    return any(_ABOUT_AUTHOR.search(h) for h in iter_heading_texts(root))
 
 
 def _classify_doc(epub, path: str) -> str:
@@ -851,15 +884,13 @@ def _classify_doc(epub, path: str) -> str:
             if len(text_parts) < 40 and el.text:
                 text_parts.append(el.text)
 
-    fname = os.path.splitext(os.path.basename(path))[0].lower()
+    fname = doc_stem(path)
     all_text = " ".join(text_parts)
     has_copyright_class = any(
         c.startswith(_COPYRIGHT_CLASS_PREFIXES) for c in all_classes)
 
-    for ht in all_headings:
-        if _ABOUT_AUTHOR.search(ht):
-            return "about_author"
-    if fname in _ABOUT_AUTHOR_FILENAME_HINTS:
+    if is_about_author_filename(path) or any(
+            _ABOUT_AUTHOR.search(ht) for ht in all_headings):
         return "about_author"
 
     if has_epub_front:

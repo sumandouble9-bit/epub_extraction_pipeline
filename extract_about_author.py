@@ -5,8 +5,7 @@ import os
 import sys
 
 from epub_parser import (
-    Block, DocumentExtractor, local_name,
-    HEADING_TAGS, _ABOUT_AUTHOR,
+    Block, DocumentExtractor, is_about_author_doc,
 )
 from css_resolver import Stylesheet
 from builder import Builder, _apply_word_allcaps
@@ -15,23 +14,6 @@ from profile import Profile, find_for_book
 import formulas
 
 _EPUB_NS = "http://www.idpf.org/2007/ops"
-
-
-def _is_about_author_doc(epub, path: str) -> bool:
-    """True when the spine document is an 'About the Author' section."""
-    root = epub.parse_xhtml(path)
-    if root is None:
-        return False
-    for el in root.iter():
-        tag = local_name(el.tag)
-        if tag is None:
-            continue
-        if tag in HEADING_TAGS:
-            heading_text = (el.text or "") + "".join(
-                c.text or "" for c in el.iter() if c is not el)
-            if _ABOUT_AUTHOR.search(heading_text.strip()):
-                return True
-    return False
 
 
 def _extract_about_author_blocks(epub) -> list[Block]:
@@ -43,7 +25,7 @@ def _extract_about_author_blocks(epub) -> list[Block]:
         path = item["path"]
         if not epub.exists(path):
             continue
-        if not _is_about_author_doc(epub, path):
+        if not is_about_author_doc(epub, path):
             continue
         root = epub.parse_xhtml(path)
         css_texts = epub.stylesheets_for(path, root)
