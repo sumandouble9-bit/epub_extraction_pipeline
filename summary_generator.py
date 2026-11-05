@@ -7,11 +7,13 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-PORTS = [8006, 8206, 8406, 8606, 8806, 9006, 9206, 8007, 8207, 
-         8407, 8607, 8807, 9007, 9207, 8008, 8208, 8408, 8608, 8808, 9008, 9208, 8009]
+# PORTS = [8006, 8206, 8406, 8606, 8806, 9006, 9206, 8007, 8207,
+#          8407, 8607, 8807, 9007, 9207, 8008, 8208, 8408, 8608, 8808, 9008, 9208, 8009]
+# Text/summary LLM disabled: no ports in use.
+PORTS = []
 SERVER_IP = "103.181.20.53"
 LLAMA_URLS = [f"http://{SERVER_IP}:{port}/v1/chat/completions" for port in PORTS]
-LLAMA_WORKERS = len(LLAMA_URLS) * 8
+LLAMA_WORKERS = max(len(LLAMA_URLS) * 8, 1)
 
 _healthy_urls: list[str] = []
 _port_shift_log: list[str] = []

@@ -19,6 +19,10 @@ from equation_refiner import refine_equations_via_llm
 from summary_generator import add_chunk_summaries
 from profile import Profile, find_for_book, list_builtin
 
+# Toggle for the text/summary LLM server. Left off so only the equation LLM
+# server is used; set True (and start the summary server) to re-enable it.
+USE_TEXT_SUMMARY_LLM = False
+
 
 class _ErrorCapture(Thread):
     """Thread wrapper that captures exceptions for the caller to inspect."""
@@ -626,7 +630,7 @@ def cmd_convert(args) -> int:
         existing_title = os.path.join(base_out, name_check, "%s_title.json" % name_check)
         existing_links = os.path.join(base_out, name_check, "%s_links.json" % name_check)
         if os.path.isfile(existing_json):
-            if not args.no_summary:
+            if USE_TEXT_SUMMARY_LLM and not args.no_summary:
                 try:
                     with open(existing_json, "r", encoding="utf-8") as f:
                         items = json.load(f)
@@ -729,7 +733,7 @@ def cmd_convert(args) -> int:
             t.start()
             llm_threads.append(t)
 
-        if profile.emit_summary:
+        if USE_TEXT_SUMMARY_LLM and profile.emit_summary:
             t = _ErrorCapture(target=add_chunk_summaries,
                               args=(result.items,),
                               kwargs={"skip": args.no_summary, "log_data": log_data, "batch": getattr(args, "batch", False)})
