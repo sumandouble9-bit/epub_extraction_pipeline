@@ -391,7 +391,33 @@ class Builder:
             parts.append(formulas.normalize_prompt(text[prev_end:]))
             item["prompt_text"] = "".join(parts)
             item["hash_id"] = hash_ids
+
+        if not heading_type and classification.kind == formulas.TEXT:
+            self._apply_image_anchors(item, text, block)
         return item, equations
+
+    def _apply_image_anchors(self, item, text, block):
+        """Drop an [image_anchor_<hash>] in prompt_text where each inline image
+        sits, and stamp the matching hash_id on the image. Paragraph text only;
+        standalone images are left untouched."""
+        refs = sorted(
+            (r for r in block.images if getattr(r, "inline", False) and r.offset >= 0),
+            key=lambda r: r.offset)
+        if not refs or not text.strip():
+            return
+        parts = []
+        prev = 0
+        for ref in refs:
+            pos = max(prev, min(ref.offset, len(text)))
+            ref.hash_id = self._hash("img|%s|%s|%d" % (
+                block.doc, posixpath.basename(ref.path or ""), pos))
+            parts.append(formulas.normalize_prompt(text[prev:pos]))
+            parts.append(formulas.image_anchor(ref.hash_id))
+            prev = pos
+        parts.append(formulas.normalize_prompt(text[prev:]))
+        prompt = "".join(parts)
+        item["prompt_text"] = prompt
+        item["token_count"] = len(prompt.split())
 
     def _split_heading(self, block):
         marker = self.profile.heading_split
@@ -563,7 +589,7 @@ class Builder:
             info = self._measure(ref)
             self._image_cache[ref.path] = info
         style = item.get("applied_style") or ""
-        return {
+        payload = {
             "type": "image",
             "link_name": name,
             "image_path": self.profile.image_path_template.format(book=self.book_name, name=name),
@@ -577,6 +603,9 @@ class Builder:
             "space_before_pt": 0.0,
             "space_after_pt": 0.0,
         }
+        if getattr(ref, "hash_id", None):
+            payload["hash_id"] = ref.hash_id
+        return payload
 
     def _measure(self, ref) -> dict:
         width_px = height_px = None

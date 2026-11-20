@@ -782,3 +782,7 @@ def _convert(fragment: str, style: str = "latex") -> str:
 
 def anchor(hash_id: str) -> str:
     return "[formula_anchor_%s]" % hash_id
+
+
+def image_anchor(hash_id: str) -> str:
+    return "[image_anchor_%s]" % hash_id

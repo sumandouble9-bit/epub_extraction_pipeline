@@ -162,6 +162,12 @@ class ImageRef:
     alt: str = ""
     width_attr: str | None = None
     height_attr: str | None = None
+    # Character offset of the image within its paragraph's text, set only when
+    # the image sits inline among text (-1 otherwise). The builder uses it to
+    # drop an anchor at the image's position and give it a hash_id.
+    offset: int = -1
+    inline: bool = False
+    hash_id: str | None = None
 
 
 @dataclass
@@ -437,7 +443,10 @@ class DocumentExtractor:
                 child_path = node_path + [self._el_desc(child)]
                 child_styles, child_decls = self._element_styles(child, child_path, node_styles, node_decls)
                 if tag == "img":
-                    images.append(self._image_ref(child))
+                    ref = self._image_ref(child)
+                    ref.inline = True
+                    images.append(ref)
+                    chunks.append((ref, node_styles))
                 elif tag == "br":
                     chunks.append((_BR, node_styles))
                 elif tag == "table":
@@ -516,6 +525,9 @@ class DocumentExtractor:
         spans: list[tuple[int, int, frozenset]] = []
         length = 0
         for raw, styles in chunks:
+            if isinstance(raw, ImageRef):
+                raw.offset = length
+                continue
             if raw is _BR:
                 while pieces and pieces[-1].endswith(" "):
                     s, e, st = spans[-1]
@@ -615,6 +627,7 @@ class DocumentExtractor:
 
         if _NL not in text:
             spans = self._merge_spans(text, spans)
+            self._localize_image_offsets(images, text, 0, len(text))
             return [Block(kind="para", text=text,
                           runs=self._make_runs(text, spans, styles),
                           images=images, **shared)]
@@ -628,20 +641,35 @@ class DocumentExtractor:
             if segment.strip():
                 seg_spans = self._clip_spans(segment, spans, line_start, pos)
                 seg_spans = self._merge_spans(segment, seg_spans)
+                seg_images = [r for r in images if line_start <= r.offset <= pos]
+                self._localize_image_offsets(seg_images, segment, line_start, pos)
                 out.append(Block(kind="para", text=segment.strip(),
                                  runs=self._make_runs(segment, seg_spans, styles),
-                                 images=images if not out else [], **shared))
+                                 images=seg_images, **shared))
             line_start = pos + 1
         tail = text[line_start:]
         if tail.strip():
             seg_spans = self._clip_spans(tail, spans, line_start, len(text))
             seg_spans = self._merge_spans(tail, seg_spans)
+            tail_images = [r for r in images if r.offset >= line_start]
+            self._localize_image_offsets(tail_images, tail, line_start, len(text))
             out.append(Block(kind="para", text=tail.strip(),
                              runs=self._make_runs(tail, seg_spans, styles),
-                             images=[] if out else images, **shared))
+                             images=tail_images, **shared))
         return out or [Block(kind="para", text=text.strip(),
                              runs=self._make_runs(text, self._merge_spans(text, spans), styles),
                              images=images, **shared)]
+
+    @staticmethod
+    def _localize_image_offsets(images, segment, lo, hi):
+        """Rebase inline image offsets to the stripped segment they belong to."""
+        leading = len(segment) - len(segment.lstrip())
+        stripped_len = len(segment.strip())
+        for ref in images:
+            if ref.offset < 0:
+                continue
+            local = max(0, min(ref.offset, hi) - lo - leading)
+            ref.offset = min(local, stripped_len)
 
     @staticmethod
     def _clip_spans(segment, spans, offset, end):
